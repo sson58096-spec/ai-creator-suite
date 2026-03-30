@@ -1,30 +1,4 @@
-// Central API configuration
-// Replace this URL with your actual backend URL (e.g., from Render)
-const API_BASE_URL = "https://your-backend-url.onrender.com/api";
-
-async function apiRequest<T>(endpoint: string, options?: RequestInit): Promise<T> {
-  const url = `${API_BASE_URL}${endpoint}`;
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-
-  // Add API key from localStorage if available
-  const apiKey = localStorage.getItem("ai_api_key");
-  if (apiKey) {
-    headers["Authorization"] = `Bearer ${apiKey}`;
-  }
-
-  const res = await fetch(url, {
-    ...options,
-    headers: { ...headers, ...options?.headers },
-  });
-
-  if (!res.ok) {
-    throw new Error(`API Error: ${res.status} ${res.statusText}`);
-  }
-
-  return res.json();
-}
+import { supabase } from "@/integrations/supabase/client";
 
 // --- Script Generation ---
 export interface GenerateScriptRequest {
@@ -39,78 +13,94 @@ export interface GenerateScriptResponse {
   tags: string[];
 }
 
-export const generateScript = (data: GenerateScriptRequest) =>
-  apiRequest<GenerateScriptResponse>("/generate/script", {
-    method: "POST",
-    body: JSON.stringify(data),
+export const generateScript = async (data: GenerateScriptRequest): Promise<GenerateScriptResponse> => {
+  const { data: result, error } = await supabase.functions.invoke("generate-script", {
+    body: data,
   });
+  if (error) throw new Error(error.message || "Failed to generate script");
+  if (result?.error) throw new Error(result.error);
+  return result;
+};
 
 // --- Image Generation ---
 export interface GenerateImageRequest {
   prompt: string;
   style?: string;
-  width?: number;
-  height?: number;
 }
 
 export interface GenerateImageResponse {
   imageUrl: string;
 }
 
-export const generateImage = (data: GenerateImageRequest) =>
-  apiRequest<GenerateImageResponse>("/generate/image", {
+export const generateImage = async (data: GenerateImageRequest): Promise<GenerateImageResponse> => {
+  const { data: result, error } = await supabase.functions.invoke("generate-image", {
+    body: data,
+  });
+  if (error) throw new Error(error.message || "Failed to generate image");
+  if (result?.error) throw new Error(result.error);
+  return result;
+};
+
+// --- Chat (Streaming) ---
+export type ChatMessage = { role: "user" | "assistant"; content: string };
+
+export async function streamChat({
+  messages,
+  onDelta,
+  onDone,
+}: {
+  messages: ChatMessage[];
+  onDelta: (text: string) => void;
+  onDone: () => void;
+}) {
+  const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
+
+  const resp = await fetch(CHAT_URL, {
     method: "POST",
-    body: JSON.stringify(data),
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+    },
+    body: JSON.stringify({ messages }),
   });
 
-// --- Video Generation (Runway / Pika) ---
-export interface GenerateVideoRequest {
-  prompt: string;
-  provider?: "runway" | "pika";
-  duration?: number;
+  if (!resp.ok || !resp.body) {
+    const errData = await resp.json().catch(() => ({}));
+    throw new Error(errData.error || `Chat failed: ${resp.status}`);
+  }
+
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder();
+  let textBuffer = "";
+  let streamDone = false;
+
+  while (!streamDone) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    textBuffer += decoder.decode(value, { stream: true });
+
+    let newlineIndex: number;
+    while ((newlineIndex = textBuffer.indexOf("\n")) !== -1) {
+      let line = textBuffer.slice(0, newlineIndex);
+      textBuffer = textBuffer.slice(newlineIndex + 1);
+
+      if (line.endsWith("\r")) line = line.slice(0, -1);
+      if (line.startsWith(":") || line.trim() === "") continue;
+      if (!line.startsWith("data: ")) continue;
+
+      const jsonStr = line.slice(6).trim();
+      if (jsonStr === "[DONE]") { streamDone = true; break; }
+
+      try {
+        const parsed = JSON.parse(jsonStr);
+        const content = parsed.choices?.[0]?.delta?.content as string | undefined;
+        if (content) onDelta(content);
+      } catch {
+        textBuffer = line + "\n" + textBuffer;
+        break;
+      }
+    }
+  }
+
+  onDone();
 }
-
-export interface GenerateVideoResponse {
-  videoUrl: string;
-  status: string;
-}
-
-export const generateVideo = (data: GenerateVideoRequest) =>
-  apiRequest<GenerateVideoResponse>("/generate/video", {
-    method: "POST",
-    body: JSON.stringify(data),
-  });
-
-// --- Auto YouTube ---
-export interface AutoYouTubeRequest {
-  topic: string;
-  style?: string;
-  autoUpload?: boolean;
-}
-
-export interface AutoYouTubeResponse {
-  videoUrl: string;
-  title: string;
-  description: string;
-  status: string;
-}
-
-export const autoYouTube = (data: AutoYouTubeRequest) =>
-  apiRequest<AutoYouTubeResponse>("/auto-youtube", {
-    method: "POST",
-    body: JSON.stringify(data),
-  });
-
-// --- Assets ---
-export interface Asset {
-  id: string;
-  name: string;
-  type: "image" | "video" | "script";
-  url: string;
-  createdAt: string;
-}
-
-export const getAssets = () => apiRequest<Asset[]>("/assets");
-
-export const deleteAsset = (id: string) =>
-  apiRequest<void>(`/assets/${id}`, { method: "DELETE" });
