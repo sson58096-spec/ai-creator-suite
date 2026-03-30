@@ -1,7 +1,7 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.ai.youtube',
+  appId: 'app.lovable.f501f4a7a9b14ddf9ef17bdc77879bfc',
   appName: 'AI YouTube Studio',
   webDir: 'dist',
   server: {

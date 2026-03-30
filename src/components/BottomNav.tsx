@@ -1,11 +1,11 @@
 import { useLocation, useNavigate } from "react-router-dom";
-import { LayoutDashboard, Sparkles, Youtube, Film, FolderOpen, Key } from "lucide-react";
+import { LayoutDashboard, Sparkles, Youtube, MessageCircle, FolderOpen, Key } from "lucide-react";
 
 const navItems = [
   { path: "/", icon: LayoutDashboard, label: "Home" },
   { path: "/generate", icon: Sparkles, label: "Generate" },
   { path: "/auto-youtube", icon: Youtube, label: "Auto YT" },
-  { path: "/editor", icon: Film, label: "Editor" },
+  { path: "/chat", icon: MessageCircle, label: "Chat" },
   { path: "/assets", icon: FolderOpen, label: "Assets" },
   { path: "/api-keys", icon: Key, label: "Keys" },
 ];
