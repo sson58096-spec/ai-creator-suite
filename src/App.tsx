@@ -7,7 +7,7 @@ import BottomNav from "@/components/BottomNav";
 import Index from "./pages/Index";
 import Generate from "./pages/Generate";
 import AutoYouTube from "./pages/AutoYouTube";
-import Editor from "./pages/Editor";
+import Chat from "./pages/Chat";
 import Assets from "./pages/Assets";
 import ApiKeys from "./pages/ApiKeys";
 import NotFound from "./pages/NotFound";
@@ -24,7 +24,7 @@ const App = () => (
           <Route path="/" element={<Index />} />
           <Route path="/generate" element={<Generate />} />
           <Route path="/auto-youtube" element={<AutoYouTube />} />
-          <Route path="/editor" element={<Editor />} />
+          <Route path="/chat" element={<Chat />} />
           <Route path="/assets" element={<Assets />} />
           <Route path="/api-keys" element={<ApiKeys />} />
           <Route path="*" element={<NotFound />} />
